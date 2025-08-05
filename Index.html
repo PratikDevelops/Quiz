@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Hadoop Quiz App</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #cce3f9, #f2f7fd);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .quiz-container {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      padding: 30px;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    .quiz-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .quiz-header h1 {
+      margin: 0;
+      font-size: 24px;
+      color: #333;
+    }
+
+    .question {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .option {
+      background: #f1f5f9;
+      padding: 12px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .option:hover {
+      background: #e0efff;
+    }
+
+    .option.correct {
+      background-color: #d1f7c4;
+      border-color: #4caf50;
+    }
+
+    .option.wrong {
+      background-color: #ffd1d1;
+      border-color: #f44336;
+    }
+
+    .explanation {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #444;
+      background: #f9fafc;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .timer, .score {
+      text-align: right;
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    #nextBtn, #restartBtn {
+      display: block;
+      margin: 20px auto 0;
+      padding: 12px 24px;
+      font-size: 16px;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    #nextBtn:hover, #restartBtn:hover {
+      background: #357ac7;
+    }
+
+    #confetti-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="confetti-canvas"></canvas>
+  <div class="quiz-container">
+    <div class="quiz-header">
+      <h1>Hadoop Quiz</h1>
+    </div>
+    <div class="timer">⏱️ Time Left: <span id="timer">45</span>s</div>
+    <div class="score">Score: <span id="score">0</span></div>
+    <div class="question" id="questionText"></div>
+    <div class="options" id="optionButtons"></div>
+    <div class="explanation" id="explanation"></div>
+    <button id="nextBtn" style="display: none;">Next Question</button>
+    <button id="restartBtn" style="display: none;">Restart Quiz</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+  <script>
+    const questions = [
+      {
+        question: "Which component of the Hadoop ecosystem is responsible for distributed data storage?",
+        options: ["YARN", "Hive", "HDFS", "Pig"],
+        correct: 2,
+        explanation: "HDFS (Hadoop Distributed File System) is responsible for distributed storage."
+      },
+      {
+        question: "What is the main role of YARN in the Hadoop ecosystem?",
+        options: ["Querying structured data", "Managing data storage", "Resource management and job scheduling", "Data cleaning"],
+        correct: 2,
+        explanation: "YARN (Yet Another Resource Negotiator) handles resource management and job scheduling."
+      },
+      {
+        question: "Which Hadoop tool allows SQL-like queries on large datasets?",
+        options: ["Flume", "Hive", "Oozie", "HBase"],
+        correct: 1,
+        explanation: "Hive enables SQL-like querying on large datasets stored in Hadoop."
+      },
+      {
+        question: "Which tool is used to process streaming data in real-time in Hadoop?",
+        options: ["Pig", "Sqoop", "Storm", "Flume"],
+        correct: 2,
+        explanation: "Apache Storm is used for real-time stream data processing."
+      },
+      {
+        question: "Which component is best for importing structured data from RDBMS to HDFS?",
+        options: ["Pig", "Sqoop", "Hive", "Mahout"],
+        correct: 1,
+        explanation: "Sqoop efficiently imports/export structured data between RDBMS and HDFS."
+      }
+    ];
+
+    let currentQuestion = 0;
+    let score = 0;
+    let timer;
+    let timeLeft = 45;
+
+    const questionText = document.getElementById("questionText");
+    const optionButtons = document.getElementById("optionButtons");
+    const explanationDiv = document.getElementById("explanation");
+    const nextBtn = document.getElementById("nextBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const timerDisplay = document.getElementById("timer");
+    const scoreDisplay = document.getElementById("score");
+
+    function startQuiz() {
+      score = 0;
+      currentQuestion = 0;
+      nextBtn.style.display = "none";
+      restartBtn.style.display = "none";
+      scoreDisplay.textContent = score;
+      showQuestion();
+    }
+
+    function showQuestion() {
+      clearInterval(timer);
+      timeLeft = 45;
+      updateTimer();
+      timer = setInterval(() => {
+        timeLeft--;
+        updateTimer();
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          lockOptions();
+          nextBtn.style.display = "block";
+        }
+      }, 1000);
+
+      const q = questions[currentQuestion];
+      questionText.textContent = q.question;
+      optionButtons.innerHTML = "";
+      explanationDiv.textContent = "";
+
+      q.options.forEach((opt, index) => {
+        const btn = document.createElement("button");
+        btn.textContent = opt;
+        btn.classList.add("option");
+        btn.addEventListener("click", () => selectOption(index, btn));
+        optionButtons.appendChild(btn);
+      });
+
+      nextBtn.style.display = "none";
+    }
+
+    function updateTimer() {
+      timerDisplay.textContent = timeLeft;
+    }
+
+    function selectOption(selected, btn) {
+      clearInterval(timer);
+      const correctIndex = questions[currentQuestion].correct;
+      const buttons = optionButtons.querySelectorAll("button");
+
+      buttons.forEach((b, i) => {
+        b.disabled = true;
+        if (i === correctIndex) b.classList.add("correct");
+        else if (i === selected) b.classList.add("wrong");
+      });
+
+      if (selected === correctIndex) {
+        score++;
+        scoreDisplay.textContent = score;
+      }
+
+      explanationDiv.textContent = questions[currentQuestion].explanation;
+      nextBtn.style.display = "block";
+    }
+
+    function lockOptions() {
+      const correctIndex = questions[currentQuestion].correct;
+      const buttons = optionButtons.querySelectorAll("button");
+      buttons.forEach((b, i) => {
+        b.disabled = true;
+        if (i === correctIndex) b.classList.add("correct");
+      });
+      explanationDiv.textContent = questions[currentQuestion].explanation;
+    }
+
+    nextBtn.addEventListener("click", () => {
+      currentQuestion++;
+      if (currentQuestion < questions.length) {
+        showQuestion();
+      } else {
+        showResult();
+      }
+    });
+
+    restartBtn.addEventListener("click", () => {
+      startQuiz();
+    });
+
+    function showResult() {
+      questionText.textContent = `🎉 Quiz Completed!`;
+      optionButtons.innerHTML = "";
+      explanationDiv.textContent = `You scored ${score} out of ${questions.length}.`;
+      nextBtn.style.display = "none";
+      restartBtn.style.display = "block";
+
+      // Confetti
+      confetti({
+        particleCount: 150,
+        spread: 100,
+        origin: { y: 0.6 }
+      });
+
+      // Save high score
+      const high = localStorage.getItem("hadoopQuizHigh") || 0;
+      if (score > high) {
+        localStorage.setItem("hadoopQuizHigh", score);
+      }
+    }
+
+    startQuiz();
+  </script>
+</body>
+</html>
